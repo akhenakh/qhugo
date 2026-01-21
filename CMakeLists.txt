@@ -18,12 +18,20 @@ add_custom_target(go_backend DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/backend/backend
 
 qt_standard_project_setup()
 
+# Include highlighter directory
+include_directories(highlighter)
+
 qt_add_executable(appQtMarkdown
     main.cpp
     filecontroller.cpp
     filecontroller.h
-    markdownhighlighter.cpp  
-    markdownhighlighter.h    
+    markdownhighlighter.cpp
+    markdownhighlighter.h
+    # Add Library Files
+    highlighter/languagedata.cpp
+    highlighter/languagedata.h
+    highlighter/qsourcehighliterthemes.cpp
+    highlighter/qsourcehighliterthemes.h
 )
 
 qt_add_qml_module(appQtMarkdown

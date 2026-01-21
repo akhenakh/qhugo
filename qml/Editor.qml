@@ -1,10 +1,16 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtMarkdown 1.0 // Import the module containing our C++ class
+import QtMarkdown 1.0
 
 Item {
     id: root
+
+    // FIX: Use 'sequences' (list) instead of 'sequence' for StandardKey
+    Shortcut {
+        sequences: [StandardKey.Close]
+        onActivated: closeTab(tabBar.currentIndex)
+    }
 
     function openFile(path) {
         var cleanPath = path.toString().replace("file://", "")
@@ -21,6 +27,17 @@ Item {
         tabBar.currentIndex = tabModel.count - 1
     }
 
+    function closeTab(index) {
+        if (index < 0 || index >= tabModel.count) return;
+        
+        // Remove from model
+        tabModel.remove(index);
+        
+        if (tabBar.currentIndex >= tabModel.count) {
+            tabBar.currentIndex = tabModel.count - 1;
+        }
+    }
+
     ListModel { id: tabModel }
 
     ColumnLayout {
@@ -30,11 +47,40 @@ Item {
         TabBar {
             id: tabBar
             Layout.fillWidth: true
+            
             Repeater {
                 model: tabModel
+                
                 TabButton {
-                    text: title
-                    width: implicitWidth + 20
+                    id: tabBtn
+                    width: implicitWidth + 30 
+                    
+                    contentItem: RowLayout {
+                        spacing: 5
+                        Label {
+                            text: title
+                            font: tabBtn.font
+                            color: tabBtn.checked ? (Qt.application.styleHints.colorScheme === Qt.Dark ? "white" : "black") : "#888"
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                        }
+                        
+                        ToolButton {
+                            text: "×"
+                            font.pixelSize: 16
+                            Layout.preferredWidth: 20
+                            Layout.preferredHeight: 20
+                            background: Rectangle { color: "transparent" }
+                            visible: tabBtn.hovered || tabBtn.checked
+                            
+                            onClicked: {
+                                closeTab(index)
+                            }
+                        }
+                    }
+                    
                     onClicked: tabBar.currentIndex = index
                 }
             }
@@ -57,6 +103,7 @@ Item {
                     ColumnLayout {
                         anchors.fill: parent
                         
+                        // Toolbar
                         RowLayout {
                             Layout.fillWidth: true
                             Layout.margins: 5
@@ -84,6 +131,7 @@ Item {
                             Item { Layout.fillWidth: true }
                         }
 
+                        // Editor Area
                         ScrollView {
                             id: scrollView
                             Layout.fillWidth: true
@@ -93,6 +141,7 @@ Item {
                             Row {
                                 width: scrollView.availableWidth 
                                 
+                                // Line Numbers
                                 Column {
                                     id: lineNumbers
                                     width: 40
@@ -133,8 +182,6 @@ Item {
                                     
                                     color: tabItem.previewMode ? "black" : Qt.application.styleHints.colorScheme === Qt.Dark ? "white" : "black"
 
-                                    // --- SYNTAX HIGHLIGHTING ---
-                                    // Attach the C++ Highlighter to this TextArea's document
                                     MarkdownHighlighter {
                                         id: highlighter
                                         document: textArea.textDocument

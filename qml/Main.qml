@@ -10,7 +10,7 @@ ApplicationWindow {
     visible: true
     title: "QtGo Markdown"
 
-    // Use Documents location to avoid scanning the entire Home directory
+    // Single source of truth for directory state
     property string currentDir: Platform.StandardPaths.writableLocation(Platform.StandardPaths.DocumentsLocation)
 
     Shortcut {
@@ -30,24 +30,33 @@ ApplicationWindow {
             SplitView.preferredWidth: 250
             SplitView.minimumWidth: 150
             SplitView.maximumWidth: 400
+            
+            // One-way binding: Sidebar follows Window
             currentDirectory: window.currentDir
             
+            // Handlers update Window, which flows back to Sidebar
             onFileSelected: function(path) {
                 editor.openFile(path)
+            }
+            
+            onDirectorySelected: function(path) {
+                window.currentDir = path
+            }
+            
+            onGoUpClicked: {
+                window.currentDir = FileController.getParentPath(window.currentDir)
             }
         }
 
         Editor {
             id: editor
-            SplitView.fillWidth: true // Take remaining space
+            SplitView.fillWidth: true 
         }
     }
 
     FuzzyFinder {
         id: fuzzyFinder
         rootPath: window.currentDir
-        
-        // FIX: Explicitly declare function parameter 'path'
         onFileSelected: function(path) {
             editor.openFile(path)
         }

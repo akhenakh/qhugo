@@ -13,6 +13,7 @@ public:
     Q_INVOKABLE QStringList scanDirectory(const QString &path);
     Q_INVOKABLE QString readFile(const QString &path);
     Q_INVOKABLE bool saveFile(const QString &path, const QString &content);
+    Q_INVOKABLE QString getParentPath(const QString &path); // ADD THIS
     
     // Go/MCP stuff remains here
     Q_INVOKABLE QString connectMcp(const QString &command);

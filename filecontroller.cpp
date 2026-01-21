@@ -57,6 +57,19 @@ QStringList FileController::scanDirectory(const QString &path) {
     return fileList;
 }
 
+QString FileController::getParentPath(const QString &path) {
+    QString localPath = path;
+    if (path.startsWith("file://")) {
+        localPath = QUrl(path).toLocalFile();
+    }
+
+    QDir dir(localPath);
+    if (dir.cdUp()) {
+        return QUrl::fromLocalFile(dir.absolutePath()).toString();
+    }
+    // If we can't go up (e.g. root), return original
+    return path;
+}
 
 QString FileController::readFile(const QString &path) {
     QString localPath = path;
