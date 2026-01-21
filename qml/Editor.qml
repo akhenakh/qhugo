@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtMarkdown 1.0 // Import the module containing our C++ class
 
 Item {
     id: root
@@ -50,14 +51,12 @@ Item {
                 Item {
                     id: tabItem
                     property string path: filePath
-                    // Initialize raw content storage with file content
                     property string memoText: fileContent 
                     property bool previewMode: false
 
                     ColumnLayout {
                         anchors.fill: parent
                         
-                        // Toolbar
                         RowLayout {
                             Layout.fillWidth: true
                             Layout.margins: 5
@@ -65,19 +64,11 @@ Item {
                                 text: tabItem.previewMode ? "Edit" : "Preview"
                                 onClicked: {
                                     if (!tabItem.previewMode) {
-                                        // Switching TO Preview
-                                        // 1. Capture raw text from editor
                                         tabItem.memoText = textArea.text
-                                        // 2. Change mode (triggers TextFormat change)
                                         tabItem.previewMode = true
-                                        // 3. Force re-assignment of text so Qt interprets raw string as Markdown
-                                        //    instead of trying to convert the PlainText document structure.
                                         textArea.text = tabItem.memoText
                                     } else {
-                                        // Switching TO Edit
-                                        // 1. Change mode back to PlainText
                                         tabItem.previewMode = false
-                                        // 2. Restore raw text, overwriting any artifacts from the Markdown renderer
                                         textArea.text = tabItem.memoText
                                     }
                                 }
@@ -85,19 +76,14 @@ Item {
                             Button {
                                 text: "Save"
                                 onClicked: {
-                                    // If in preview mode, save the captured raw text.
-                                    // If in edit mode, save the current editor text.
                                     var content = tabItem.previewMode ? tabItem.memoText : textArea.text
                                     FileController.saveFile(path, content)
-                                    
-                                    // Update memo if saving in edit mode to keep sync
                                     if (!tabItem.previewMode) tabItem.memoText = content
                                 }
                             }
                             Item { Layout.fillWidth: true }
                         }
 
-                        // Editor Area
                         ScrollView {
                             id: scrollView
                             Layout.fillWidth: true
@@ -107,7 +93,6 @@ Item {
                             Row {
                                 width: scrollView.availableWidth 
                                 
-                                // Line Numbers
                                 Column {
                                     id: lineNumbers
                                     width: 40
@@ -126,18 +111,12 @@ Item {
                                     }
                                 }
 
-                                // Text / Markdown
                                 TextArea {
                                     id: textArea
                                     width: parent.width - (lineNumbers.visible ? lineNumbers.width : 0)
-                                    
-                                    // Initial binding only. 
-                                    // Subsequent updates handled by Button logic to prevent conversion data loss.
                                     text: fileContent 
-                                    
                                     textFormat: tabItem.previewMode ? TextEdit.MarkdownText : TextEdit.PlainText
                                     
-                                    // Styling Logic
                                     font.family: tabItem.previewMode ? Qt.application.font.family : "Courier New"
                                     font.pixelSize: tabItem.previewMode ? 16 : 14
                                     padding: tabItem.previewMode ? 20 : 0
@@ -153,6 +132,13 @@ Item {
                                     }
                                     
                                     color: tabItem.previewMode ? "black" : Qt.application.styleHints.colorScheme === Qt.Dark ? "white" : "black"
+
+                                    // --- SYNTAX HIGHLIGHTING ---
+                                    // Attach the C++ Highlighter to this TextArea's document
+                                    MarkdownHighlighter {
+                                        id: highlighter
+                                        document: textArea.textDocument
+                                    }
                                 }
                             }
                         }

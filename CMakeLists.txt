@@ -22,6 +22,8 @@ qt_add_executable(appQtMarkdown
     main.cpp
     filecontroller.cpp
     filecontroller.h
+    markdownhighlighter.cpp  
+    markdownhighlighter.h    
 )
 
 qt_add_qml_module(appQtMarkdown
@@ -34,7 +36,6 @@ qt_add_qml_module(appQtMarkdown
         qml/FuzzyFinder.qml
 )
 
-# Link Go Library and Threads (needed for Go runtime)
 target_link_libraries(appQtMarkdown
     PRIVATE
     Qt6::Core Qt6::Quick Qt6::Gui Qt6::QuickControls2

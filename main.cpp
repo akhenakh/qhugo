@@ -2,16 +2,20 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include "filecontroller.h"
+#include "markdownhighlighter.h" 
 
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
+
+    // Register the Highlighter Class
+    qmlRegisterType<MarkdownHighlighter>("QtMarkdown", 1, 0, "MarkdownHighlighter");
+
     QQmlApplicationEngine engine;
 
     FileController fileController;
     engine.rootContext()->setContextProperty("FileController", &fileController);
 
-    // Matches the URI set in CMake (QtMarkdown) and the file path (qml/Main.qml)
     const QUrl url(u"qrc:/QtMarkdown/qml/Main.qml"_qs);
     
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated,
