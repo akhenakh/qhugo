@@ -17,7 +17,7 @@ public:
     Q_INVOKABLE QString getParentPath(const QString &path);
     
     // Hugo Specific
-    Q_INVOKABLE void startHugoServer(const QString &repoPath);
+    Q_INVOKABLE int startHugoServer(const QString &repoPath);
     Q_INVOKABLE void stopHugoServer();
     Q_INVOKABLE QString processImage(const QString &srcPath, const QString &repoPath, const QString &docPath);
     Q_INVOKABLE QString createPost(const QString &repoPath, const QString &title);

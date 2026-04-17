@@ -12,6 +12,7 @@ ApplicationWindow {
     title: "QHugo"
 
     property string currentDir: Platform.StandardPaths.writableLocation(Platform.StandardPaths.DocumentsLocation)
+    property int hugoPort: 1313
 
     Shortcut {
         sequence: "Ctrl+P"
@@ -23,7 +24,9 @@ ApplicationWindow {
     }
 
     onCurrentDirChanged: {
-        FileController.startHugoServer(currentDir)
+        // Retrieve dynamic port and reset web view
+        window.hugoPort = FileController.startHugoServer(currentDir)
+        webView.url = ""
         // Delay navigation slightly to let Hugo boot up
         previewTimer.start()
     }
@@ -31,7 +34,10 @@ ApplicationWindow {
     Timer {
         id: previewTimer
         interval: 1000
-        onTriggered: webView.url = "http://localhost:1313"
+        onTriggered: {
+            console.log("Loading Hugo Preview on Port:", window.hugoPort)
+            webView.url = "http://localhost:" + window.hugoPort
+        }
     }
 
     header: ToolBar {
@@ -49,7 +55,6 @@ ApplicationWindow {
         }
     }
 
-    // FIX: Added the Platform. prefix here
     Platform.FolderDialog {
         id: folderDialog
         onAccepted: window.currentDir = folderDialog.folder
@@ -113,7 +118,6 @@ ApplicationWindow {
             id: webView
             SplitView.preferredWidth: 600
             SplitView.fillWidth: true
-            url: "http://localhost:1313"
         }
     }
 

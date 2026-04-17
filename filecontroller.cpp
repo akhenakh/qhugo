@@ -88,12 +88,12 @@ bool FileController::saveFile(const QString &path, const QString &content) {
     return SaveFileContent(localPath.toUtf8().data(), content.toUtf8().data()) == 1;
 }
 
-void FileController::startHugoServer(const QString &repoPath) {
+int FileController::startHugoServer(const QString &repoPath) {
     QString localPath = repoPath;
     if (repoPath.startsWith("file://")) {
         localPath = QUrl(repoPath).toLocalFile();
     }
-    StartHugo(localPath.toUtf8().data());
+    return StartHugo(localPath.toUtf8().data());
 }
 
 void FileController::stopHugoServer() {

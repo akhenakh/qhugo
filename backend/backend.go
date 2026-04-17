@@ -12,6 +12,7 @@ import (
 	"image/jpeg"
 	_ "image/png"
 	"log"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -51,15 +52,37 @@ func FreeString(str *C.char) {
 	C.free(unsafe.Pointer(str))
 }
 
+func getFreePort() (int, error) {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	if err != nil {
+		return 0, err
+	}
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return 0, err
+	}
+	defer l.Close() // Closes the listener, freeing the port for Hugo
+	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
 //export StartHugo
-func StartHugo(repoC *C.char) {
+func StartHugo(repoC *C.char) int {
 	repo := C.GoString(repoC)
 	if hugoCmd != nil && hugoCmd.Process != nil {
 		hugoCmd.Process.Kill()
 	}
-	// Launch hugo in background (assumes hugo binary is in PATH)
-	hugoCmd = exec.Command("hugo", "server", "-s", repo, "-p", "1313", "-D")
+
+	port, err := getFreePort()
+	if err != nil {
+		log.Println("Error finding free port, falling back to 1313:", err)
+		port = 1313
+	}
+
+	// Launch hugo in background
+	hugoCmd = exec.Command("hugo", "server", "-s", repo, "-p", fmt.Sprintf("%d", port), "-D")
 	hugoCmd.Start()
+
+	return port
 }
 
 //export StopHugo

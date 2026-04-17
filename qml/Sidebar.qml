@@ -25,6 +25,7 @@ Item {
                 anchors.margins: 5
                 
                 Button {
+                    id: goUpBtn
                     icon.name: "go-up"
                     text: ".."
                     Layout.preferredWidth: 40
@@ -32,9 +33,12 @@ Item {
                     display: AbstractButton.IconOnly 
                     onClicked: root.goUpClicked()
                     
-                    ToolTip.visible: hovered
-                    ToolTip.delay: 500
-                    ToolTip.text: "Up one level"
+                    // FIX: Use explicit ToolTip object to avoid Breeze binding loops
+                    ToolTip {
+                        parent: goUpBtn
+                        visible: goUpBtn.hovered
+                        text: "Up one level"
+                    }
                 }
 
                 Label {
