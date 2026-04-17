@@ -140,6 +140,23 @@ QString FileController::createPost(const QString &repoPath, const QString &title
     return contentPath;
 }
 
+QString FileController::getHugoURL(const QString &filePath, const QString &repoPath) {
+    QString localFile = filePath;
+    if (filePath.startsWith("file://")) {
+        localFile = QUrl(filePath).toLocalFile();
+    }
+
+    QString localRepo = repoPath;
+    if (repoPath.startsWith("file://")) {
+        localRepo = QUrl(repoPath).toLocalFile();
+    }
+
+    char* result = GetHugoURL(localFile.toUtf8().data(), localRepo.toUtf8().data());
+    QString qResult = QString::fromUtf8(result);
+    FreeString(result);
+    return qResult;
+}
+
 QString FileController::loadConfigCurrent() {
     char* result = LoadConfigCurrent();
     QString qResult = QString::fromUtf8(result);

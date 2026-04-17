@@ -307,4 +307,41 @@ func ProcessImage(srcC, repoC, docC *C.char) *C.char {
 	return C.CString(markdownLink)
 }
 
+//export GetHugoURL
+func GetHugoURL(filePathC, repoPathC *C.char) *C.char {
+	filePath := C.GoString(filePathC)
+	repoPath := C.GoString(repoPathC)
+
+	// Get the relative path from the repo root
+	relPath, err := filepath.Rel(repoPath, filePath)
+	if err != nil {
+		return C.CString("")
+	}
+
+	// Hugo content is typically in /content/ directory
+	// URL mapping: /content/section/page.md -> /section/page/
+	// or for posts: /content/post/YYYY/post-name.md -> /post/YYYY/post-name/
+
+	// Check if it's in the content directory
+	contentPrefix := "content"
+	if strings.HasPrefix(relPath, contentPrefix+string(filepath.Separator)) {
+		// Remove the "content/" prefix
+		urlPath := relPath[len(contentPrefix)+1:]
+
+		// Remove .md extension
+		urlPath = strings.TrimSuffix(urlPath, ".md")
+
+		// Replace backslashes with forward slashes for URL
+		urlPath = strings.ReplaceAll(urlPath, "\\", "/")
+
+		// Hugo URLs typically don't end with /index, remove that suffix
+		urlPath = strings.TrimSuffix(urlPath, "/index")
+
+		return C.CString("/" + urlPath + "/")
+	}
+
+	// Not in content directory, return empty
+	return C.CString("")
+}
+
 func main() {}

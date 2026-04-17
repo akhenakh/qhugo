@@ -98,6 +98,7 @@ extern void FreeString(char* str);
 extern GoInt StartHugo(char* repoC);
 extern void StopHugo(void);
 extern char* ProcessImage(char* srcC, char* repoC, char* docC);
+extern char* GetHugoURL(char* filePathC, char* repoPathC);
 
 #ifdef __cplusplus
 }

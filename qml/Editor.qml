@@ -7,8 +7,10 @@ Item {
     id: root
     
     property string repoPath
+    property string currentFilePath: ""
 
     signal contentSaved()
+    signal fileOpened(string filePath)
 
     Shortcut {
         sequences: [StandardKey.Close]
@@ -31,6 +33,8 @@ Item {
         for (var i = 0; i < tabModel.count; ++i) {
             if (tabModel.get(i).filePath === cleanPath) {
                 tabBar.currentIndex = i
+                root.currentFilePath = cleanPath
+                root.fileOpened(cleanPath)
                 return
             }
         }
@@ -38,6 +42,18 @@ Item {
         var content = FileController.readFile(cleanPath)
         tabModel.append({ "title": cleanPath.split('/').pop(), "filePath": cleanPath, "fileContent": content })
         tabBar.currentIndex = tabModel.count - 1
+        root.currentFilePath = cleanPath
+        root.fileOpened(cleanPath)
+    }
+
+    function onTabChanged() {
+        if (tabBar.currentIndex >= 0 && tabBar.currentIndex < tabModel.count) {
+            var newPath = tabModel.get(tabBar.currentIndex).filePath
+            if (newPath !== root.currentFilePath) {
+                root.currentFilePath = newPath
+                root.fileOpened(newPath)
+            }
+        }
     }
 
     function closeTab(index) {
@@ -68,6 +84,8 @@ Item {
         TabBar {
             id: tabBar
             Layout.fillWidth: true
+            
+            onCurrentIndexChanged: root.onTabChanged()
             
             Repeater {
                 model: tabModel

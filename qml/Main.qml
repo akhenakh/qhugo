@@ -178,6 +178,17 @@ function navigateTo(dir) {
             onContentSaved: {
                 // Hugo handles live-reloading inside the webview via sockets.
             }
+            onFileOpened: function(filePath) {
+                // Navigate webview to the corresponding Hugo page
+                if (window.hugoPort > 0 && window.hugoRoot !== "") {
+                    var hugoURL = FileController.getHugoURL(filePath, window.hugoRoot)
+                    if (hugoURL !== "") {
+                        var fullURL = "http://localhost:" + window.hugoPort + hugoURL
+                        console.log("Navigating to:", fullURL)
+                        webView.url = fullURL
+                    }
+                }
+            }
         }
 
         WebEngineView {

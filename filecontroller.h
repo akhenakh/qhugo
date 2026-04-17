@@ -21,6 +21,7 @@ public:
     Q_INVOKABLE void stopHugoServer();
     Q_INVOKABLE QString processImage(const QString &srcPath, const QString &repoPath, const QString &docPath);
     Q_INVOKABLE QString createPost(const QString &repoPath, const QString &title);
+    Q_INVOKABLE QString getHugoURL(const QString &filePath, const QString &repoPath);
 
     // Config Management
     Q_INVOKABLE QString loadConfigCurrent();
