@@ -1,12 +1,15 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtMarkdown 1.0
+import QHugo 1.0
 
 Item {
     id: root
+    
+    property string repoPath
 
-    // FIX: Use 'sequences' (list) instead of 'sequence' for StandardKey
+    signal contentSaved()
+
     Shortcut {
         sequences: [StandardKey.Close]
         onActivated: closeTab(tabBar.currentIndex)
@@ -29,10 +32,7 @@ Item {
 
     function closeTab(index) {
         if (index < 0 || index >= tabModel.count) return;
-        
-        // Remove from model
         tabModel.remove(index);
-        
         if (tabBar.currentIndex >= tabModel.count) {
             tabBar.currentIndex = tabModel.count - 1;
         }
@@ -74,13 +74,9 @@ Item {
                             Layout.preferredHeight: 20
                             background: Rectangle { color: "transparent" }
                             visible: tabBtn.hovered || tabBtn.checked
-                            
-                            onClicked: {
-                                closeTab(index)
-                            }
+                            onClicked: closeTab(index)
                         }
                     }
-                    
                     onClicked: tabBar.currentIndex = index
                 }
             }
@@ -97,8 +93,6 @@ Item {
                 Item {
                     id: tabItem
                     property string path: filePath
-                    property string memoText: fileContent 
-                    property bool previewMode: false
 
                     ColumnLayout {
                         anchors.fill: parent
@@ -108,24 +102,10 @@ Item {
                             Layout.fillWidth: true
                             Layout.margins: 5
                             Button {
-                                text: tabItem.previewMode ? "Edit" : "Preview"
-                                onClicked: {
-                                    if (!tabItem.previewMode) {
-                                        tabItem.memoText = textArea.text
-                                        tabItem.previewMode = true
-                                        textArea.text = tabItem.memoText
-                                    } else {
-                                        tabItem.previewMode = false
-                                        textArea.text = tabItem.memoText
-                                    }
-                                }
-                            }
-                            Button {
                                 text: "Save"
                                 onClicked: {
-                                    var content = tabItem.previewMode ? tabItem.memoText : textArea.text
-                                    FileController.saveFile(path, content)
-                                    if (!tabItem.previewMode) tabItem.memoText = content
+                                    FileController.saveFile(path, textArea.text)
+                                    root.contentSaved()
                                 }
                             }
                             Item { Layout.fillWidth: true }
@@ -141,11 +121,9 @@ Item {
                             Row {
                                 width: scrollView.availableWidth 
                                 
-                                // Line Numbers
                                 Column {
                                     id: lineNumbers
                                     width: 40
-                                    visible: !tabItem.previewMode
                                     Repeater {
                                         model: textArea.lineCount
                                         Label {
@@ -162,29 +140,50 @@ Item {
 
                                 TextArea {
                                     id: textArea
-                                    width: parent.width - (lineNumbers.visible ? lineNumbers.width : 0)
+                                    width: parent.width - lineNumbers.width
                                     text: fileContent 
-                                    textFormat: tabItem.previewMode ? TextEdit.MarkdownText : TextEdit.PlainText
+                                    textFormat: TextEdit.PlainText
                                     
-                                    font.family: tabItem.previewMode ? Qt.application.font.family : "Courier New"
-                                    font.pixelSize: tabItem.previewMode ? 16 : 14
-                                    padding: tabItem.previewMode ? 20 : 0
-                                    leftPadding: tabItem.previewMode ? 20 : 5
+                                    font.family: "Courier New"
+                                    font.pixelSize: 14
+                                    padding: 0
+                                    leftPadding: 5
                                     
                                     wrapMode: TextEdit.Wrap
-                                    readOnly: tabItem.previewMode
                                     selectByMouse: true
                                     
                                     background: Rectangle {
-                                        color: tabItem.previewMode ? "white" : "transparent"
+                                        color: "transparent"
                                         border.width: 0
                                     }
                                     
-                                    color: tabItem.previewMode ? "black" : Qt.application.styleHints.colorScheme === Qt.Dark ? "white" : "black"
+                                    color: Qt.application.styleHints.colorScheme === Qt.Dark ? "white" : "black"
 
                                     MarkdownHighlighter {
                                         id: highlighter
                                         document: textArea.textDocument
+                                    }
+
+                                    // Catch Image Drag and Drop
+                                    DropArea {
+                                        anchors.fill: parent
+                                        keys: ["text/uri-list"]
+                                        onDropped: function(drop) {
+                                            if (drop.hasUrls) {
+                                                for (var i = 0; i < drop.urls.length; i++) {
+                                                    var url = drop.urls[i].toString()
+                                                    if (url.match(/\.(jpg|jpeg|png|gif)$/i)) {
+                                                        var link = FileController.processImage(url, root.repoPath, tabItem.path)
+                                                        if (!link.startsWith("Error")) {
+                                                            textArea.insert(textArea.cursorPosition, link + "\n")
+                                                        } else {
+                                                            console.error("Image processing error:", link)
+                                                        }
+                                                    }
+                                                }
+                                                drop.accept()
+                                            }
+                                        }
                                     }
                                 }
                             }

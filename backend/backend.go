@@ -6,108 +6,27 @@ package main
 import "C"
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
+	"image"
+	_ "image/gif"
+	"image/jpeg"
+	_ "image/png"
 	"log"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
-	"sync"
-	"time"
 	"unsafe"
 
-	"github.com/mark3labs/mcp-go/client"
-	"github.com/mark3labs/mcp-go/mcp"
+	"golang.org/x/image/draw"
 )
 
-// Global state for MCP
-var (
-	mcpClient *client.Client
-	ctx       context.Context
-	cancel    context.CancelFunc
-	mu        sync.Mutex
-)
+var hugoCmd *exec.Cmd
 
-// InitBackend initializes context
-//
 //export InitBackend
 func InitBackend() {
-	ctx, cancel = context.WithCancel(context.Background())
 }
 
-// ConnectMCP connects to an MCP server (e.g., qmd)
-//
-//export ConnectMCP
-func ConnectMCP(command *C.char) *C.char {
-	cmdStr := C.GoString(command)
-	parts := strings.Fields(cmdStr)
-	if len(parts) == 0 {
-		return C.CString(`{"error": "empty command"}`)
-	}
-
-	c, err := client.NewStdioMCPClient(parts[0], nil, parts[1:]...)
-	if err != nil {
-		return C.CString(fmt.Sprintf(`{"error": "%s"}`, err.Error()))
-	}
-
-	mu.Lock()
-	if mcpClient != nil {
-		mcpClient.Close()
-	}
-	mcpClient = c
-	mu.Unlock()
-
-	connCtx, _ := context.WithTimeout(ctx, 5*time.Second)
-	err = c.Start(connCtx)
-	if err != nil {
-		return C.CString(fmt.Sprintf(`{"error": "failed to start: %s"}`, err.Error()))
-	}
-
-	initReq := mcp.InitializeRequest{}
-	initReq.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
-	initReq.Params.ClientInfo = mcp.Implementation{Name: "QtMarkdown", Version: "1.0.0"}
-
-	_, err = c.Initialize(connCtx, initReq)
-	if err != nil {
-		return C.CString(fmt.Sprintf(`{"error": "failed to init: %s"}`, err.Error()))
-	}
-
-	return C.CString(`{"status": "connected"}`)
-}
-
-// CallMCPTool executes a tool on the connected MCP server
-//
-//export CallMCPTool
-func CallMCPTool(name *C.char, argsJson *C.char) *C.char {
-	mu.Lock()
-	defer mu.Unlock()
-	if mcpClient == nil {
-		return C.CString(`{"error": "not connected"}`)
-	}
-
-	toolName := C.GoString(name)
-	argsStr := C.GoString(argsJson)
-
-	var args map[string]interface{}
-	if err := json.Unmarshal([]byte(argsStr), &args); err != nil {
-		return C.CString(`{"error": "invalid arguments json"}`)
-	}
-
-	req := mcp.CallToolRequest{}
-	req.Params.Name = toolName
-	req.Params.Arguments = args
-
-	res, err := mcpClient.CallTool(ctx, req)
-	if err != nil {
-		return C.CString(fmt.Sprintf(`{"error": "%s"}`, err.Error()))
-	}
-
-	b, _ := json.Marshal(res)
-	return C.CString(string(b))
-}
-
-// ReadFileContent returns file content
-//
 //export ReadFileContent
 func ReadFileContent(path *C.char) *C.char {
 	b, err := os.ReadFile(C.GoString(path))
@@ -117,8 +36,6 @@ func ReadFileContent(path *C.char) *C.char {
 	return C.CString(string(b))
 }
 
-// SaveFileContent writes file content
-//
 //export SaveFileContent
 func SaveFileContent(path *C.char, content *C.char) int {
 	err := os.WriteFile(C.GoString(path), []byte(C.GoString(content)), 0644)
@@ -129,11 +46,91 @@ func SaveFileContent(path *C.char, content *C.char) int {
 	return 1
 }
 
-// FreeString frees CStrings created by Go
-//
 //export FreeString
 func FreeString(str *C.char) {
 	C.free(unsafe.Pointer(str))
+}
+
+//export StartHugo
+func StartHugo(repoC *C.char) {
+	repo := C.GoString(repoC)
+	if hugoCmd != nil && hugoCmd.Process != nil {
+		hugoCmd.Process.Kill()
+	}
+	// Launch hugo in background (assumes hugo binary is in PATH)
+	hugoCmd = exec.Command("hugo", "server", "-s", repo, "-p", "1313", "-D")
+	hugoCmd.Start()
+}
+
+//export StopHugo
+func StopHugo() {
+	if hugoCmd != nil && hugoCmd.Process != nil {
+		hugoCmd.Process.Kill()
+		hugoCmd = nil
+	}
+}
+
+// CatmullRom resize operation to scale down to blog-acceptable size
+func resizeImage(srcPath, dstPath string) error {
+	file, err := os.Open(srcPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	img, _, err := image.Decode(file)
+	if err != nil {
+		return err
+	}
+
+	bounds := img.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+
+	if width > 1200 {
+		ratio := float64(height) / float64(width)
+		newWidth := 1200
+		newHeight := int(float64(newWidth) * ratio)
+
+		dst := image.NewRGBA(image.Rect(0, 0, newWidth, newHeight))
+		draw.CatmullRom.Scale(dst, dst.Bounds(), img, bounds, draw.Over, nil)
+		img = dst
+	}
+
+	out, err := os.Create(dstPath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	return jpeg.Encode(out, img, &jpeg.Options{Quality: 85})
+}
+
+//export ProcessImage
+func ProcessImage(srcC, repoC, docC *C.char) *C.char {
+	src := C.GoString(srcC)
+	repo := C.GoString(repoC)
+	doc := C.GoString(docC)
+
+	docName := filepath.Base(doc)
+	docPrefix := strings.TrimSuffix(docName, filepath.Ext(docName))
+
+	imgDir := filepath.Join(repo, "static", "img")
+	os.MkdirAll(imgDir, 0755)
+
+	srcName := filepath.Base(src)
+	dstName := fmt.Sprintf("%s-%s", docPrefix, srcName)
+	dstName = strings.TrimSuffix(dstName, filepath.Ext(dstName)) + ".jpg"
+
+	dstPath := filepath.Join(imgDir, dstName)
+
+	err := resizeImage(src, dstPath)
+	if err != nil {
+		return C.CString(fmt.Sprintf("Error: %v", err))
+	}
+
+	markdownLink := fmt.Sprintf("![%s](/img/%s)", srcName, dstName)
+	return C.CString(markdownLink)
 }
 
 func main() {}

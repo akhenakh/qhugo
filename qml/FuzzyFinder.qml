@@ -25,7 +25,6 @@ Popup {
         filter()
     }
 
-    // Helper function to handle the actual selection
     function confirmSelection(filePath) {
         if (filePath !== undefined && filePath !== "") {
             popup.fileSelected(filePath)
@@ -42,7 +41,7 @@ Popup {
             if (query === "" || file.toLowerCase().indexOf(query) !== -1) {
                 resultModel.append({ "path": file })
                 count++
-                if (count > 50) break // limit results for performance
+                if (count > 50) break 
             }
         }
         if (resultList.count > 0) resultList.currentIndex = 0
@@ -62,22 +61,17 @@ Popup {
         TextField {
             id: filterField
             Layout.fillWidth: true
-            placeholderText: "Search files..."
+            placeholderText: "Search markdown files..."
             onTextChanged: popup.filter()
             
             Keys.onDownPressed: resultList.incrementCurrentIndex()
             Keys.onUpPressed: resultList.decrementCurrentIndex()
             
-            // Fixed Keys Handling for Enter/Return
             Keys.onEnterPressed: {
-                if (resultList.count > 0) {
-                    popup.confirmSelection(resultModel.get(resultList.currentIndex).path)
-                }
+                if (resultList.count > 0) popup.confirmSelection(resultModel.get(resultList.currentIndex).path)
             }
             Keys.onReturnPressed: {
-                if (resultList.count > 0) {
-                    popup.confirmSelection(resultModel.get(resultList.currentIndex).path)
-                }
+                if (resultList.count > 0) popup.confirmSelection(resultModel.get(resultList.currentIndex).path)
             }
         }
 
@@ -91,14 +85,10 @@ Popup {
 
             model: ListModel { id: resultModel }
             delegate: ItemDelegate {
-                // FIX: Use ListView.view instead of parent to avoid null reference errors
                 width: ListView.view.width
-                text: path.replace(popup.rootPath, "") // Show relative path
+                text: path.replace(popup.rootPath, "") 
                 highlighted: ListView.isCurrentItem
-                onClicked: {
-                    // Pass the model's 'path' role to the helper
-                    popup.confirmSelection(path)
-                }
+                onClicked: popup.confirmSelection(path)
             }
         }
     }

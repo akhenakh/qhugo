@@ -1,29 +1,28 @@
 #include "filecontroller.h"
-#include "backend.h" // Still needed for MCP/Go functions
+#include "backend.h" 
 #include <QDirIterator>
 #include <QUrl>
 #include <QDebug>
+#include <QDateTime>
+#include <QRegularExpression>
 
 FileController::FileController(QObject *parent) : QObject(parent) {
     InitBackend(); // Initialize Go runtime
 }
 
+FileController::~FileController() {
+    StopHugo();
+}
+
 QStringList FileController::scanDirectory(const QString &path) {
-    // Convert URL (file:///...) to Local Path (/...)
     QString localPath = path;
     if (path.startsWith("file://")) {
         localPath = QUrl(path).toLocalFile();
     }
 
-    qDebug() << "--- Starting Directory Scan ---";
-    qDebug() << "Input Path:" << path;
-    qDebug() << "Local Path:" << localPath;
-
     QStringList fileList;
-    
     QDir dir(localPath);
     if (!dir.exists()) {
-        qWarning() << "Directory does not exist:" << localPath;
         return fileList;
     }
 
@@ -32,28 +31,26 @@ QStringList FileController::scanDirectory(const QString &path) {
     while (it.hasNext()) {
         QString filePath = it.next();
 
-        // Skip heavy folders
+        // Skip heavy folders and build artifacts
         if (filePath.contains("/.git/") || 
             filePath.contains("/node_modules/") || 
-            filePath.contains("/build/") ||
-            filePath.contains("/.vscode/")) {
+            filePath.contains("/public/") ||
+            filePath.contains("/resources/")) {
+            continue;
+        }
+
+        // Only index markdown files in FuzzyFinder
+        if (!filePath.endsWith(".md")) {
             continue;
         }
 
         fileList.append(filePath);
         
-        // Uncomment if you want to see every file (noisy!)
-        // qDebug() << "Found:" << filePath;
-
         if (fileList.size() >= 20000) {
-            qWarning() << "Scan limit reached (20000 files)";
             break;
         }
     }
     
-    qDebug() << "--- Scan Complete ---";
-    qDebug() << "Total files returned:" << fileList.size();
-
     return fileList;
 }
 
@@ -67,7 +64,6 @@ QString FileController::getParentPath(const QString &path) {
     if (dir.cdUp()) {
         return QUrl::fromLocalFile(dir.absolutePath()).toString();
     }
-    // If we can't go up (e.g. root), return original
     return path;
 }
 
@@ -92,16 +88,53 @@ bool FileController::saveFile(const QString &path, const QString &content) {
     return SaveFileContent(localPath.toUtf8().data(), content.toUtf8().data()) == 1;
 }
 
-QString FileController::connectMcp(const QString &command) {
-    char* res = ConnectMCP(command.toUtf8().data());
+void FileController::startHugoServer(const QString &repoPath) {
+    QString localPath = repoPath;
+    if (repoPath.startsWith("file://")) {
+        localPath = QUrl(repoPath).toLocalFile();
+    }
+    StartHugo(localPath.toUtf8().data());
+}
+
+void FileController::stopHugoServer() {
+    StopHugo();
+}
+
+QString FileController::processImage(const QString &srcPath, const QString &repoPath, const QString &docPath) {
+    QString localSrc = srcPath;
+    if (srcPath.startsWith("file://")) localSrc = QUrl(srcPath).toLocalFile();
+    
+    QString localRepo = repoPath;
+    if (repoPath.startsWith("file://")) localRepo = QUrl(repoPath).toLocalFile();
+    
+    QString localDoc = docPath;
+    if (docPath.startsWith("file://")) localDoc = QUrl(docPath).toLocalFile();
+
+    char* res = ProcessImage(localSrc.toUtf8().data(), localRepo.toUtf8().data(), localDoc.toUtf8().data());
     QString qRes = QString::fromUtf8(res);
     FreeString(res);
     return qRes;
 }
 
-QString FileController::callMcpTool(const QString &name, const QString &argsJson) {
-    char* res = CallMCPTool(name.toUtf8().data(), argsJson.toUtf8().data());
-    QString qRes = QString::fromUtf8(res);
-    FreeString(res);
-    return qRes;
+QString FileController::createPost(const QString &repoPath, const QString &title) {
+    QString localRepo = repoPath;
+    if (repoPath.startsWith("file://")) {
+        localRepo = QUrl(repoPath).toLocalFile();
+    }
+    
+    QString slug = title.toLower().replace(QRegularExpression("[^a-z0-9]+"), "-");
+    QString year = QDateTime::currentDateTime().toString("yyyy");
+    
+    QString contentDir = localRepo + "/content/post/" + year;
+    QString contentPath = contentDir + "/" + slug + ".md";
+    
+    QString frontmatter = "---\n";
+    frontmatter += "title: \"" + title + "\"\n";
+    frontmatter += "date: " + QDateTime::currentDateTime().toString(Qt::ISODate) + "\n";
+    frontmatter += "draft: true\n";
+    frontmatter += "---\n\n";
+    
+    QDir().mkpath(contentDir);
+    saveFile(contentPath, frontmatter);
+    return contentPath;
 }

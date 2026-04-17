@@ -1,15 +1,16 @@
 cmake_minimum_required(VERSION 3.16)
-project(QtMarkdown)
+project(QHugo)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Quick Gui QuickControls2)
+find_package(Qt6 REQUIRED COMPONENTS Core Quick Gui QuickControls2 WebEngineQuick)
 
 # Build Go Backend
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/backend/backend.a ${CMAKE_CURRENT_SOURCE_DIR}/backend/backend.h
-    COMMAND go build -buildmode=c-archive -o backend.a backend.go
+    COMMAND go mod tidy && go build -buildmode=c-archive -o backend.a backend.go
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/backend/backend.go
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/backend
     COMMENT "Building Go backend..."
 )
@@ -21,7 +22,7 @@ qt_standard_project_setup()
 # Include highlighter directory
 include_directories(highlighter)
 
-qt_add_executable(appQtMarkdown
+qt_add_executable(appQHugo
     main.cpp
     filecontroller.cpp
     filecontroller.h
@@ -34,8 +35,8 @@ qt_add_executable(appQtMarkdown
     highlighter/qsourcehighliterthemes.h
 )
 
-qt_add_qml_module(appQtMarkdown
-    URI QtMarkdown
+qt_add_qml_module(appQHugo
+    URI QHugo
     VERSION 1.0
     QML_FILES
         qml/Main.qml
@@ -44,13 +45,13 @@ qt_add_qml_module(appQtMarkdown
         qml/FuzzyFinder.qml
 )
 
-target_link_libraries(appQtMarkdown
+target_link_libraries(appQHugo
     PRIVATE
-    Qt6::Core Qt6::Quick Qt6::Gui Qt6::QuickControls2
+    Qt6::Core Qt6::Quick Qt6::Gui Qt6::QuickControls2 Qt6::WebEngineQuick
     ${CMAKE_CURRENT_SOURCE_DIR}/backend/backend.a
     Threads::Threads
     ${CMAKE_DL_LIBS} 
 )
 
-target_include_directories(appQtMarkdown PRIVATE backend)
-add_dependencies(appQtMarkdown go_backend)
+target_include_directories(appQHugo PRIVATE backend)
+add_dependencies(appQHugo go_backend)

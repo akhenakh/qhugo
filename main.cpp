@@ -1,22 +1,28 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QtWebEngineQuick>
 #include "filecontroller.h"
 #include "markdownhighlighter.h" 
 
+using namespace Qt::StringLiterals;
+
 int main(int argc, char *argv[])
 {
+    // Important: Initialize WebEngine before QGuiApp
+    QtWebEngineQuick::initialize();
     QGuiApplication app(argc, argv);
 
     // Register the Highlighter Class
-    qmlRegisterType<MarkdownHighlighter>("QtMarkdown", 1, 0, "MarkdownHighlighter");
+    qmlRegisterType<MarkdownHighlighter>("QHugo", 1, 0, "MarkdownHighlighter");
 
     QQmlApplicationEngine engine;
 
     FileController fileController;
     engine.rootContext()->setContextProperty("FileController", &fileController);
 
-    const QUrl url(u"qrc:/QtMarkdown/qml/Main.qml"_qs);
+    // Using _s instead of _qs to fix the deprecation warning
+    const QUrl url(u"qrc:/QHugo/qml/Main.qml"_s);
     
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated,
                      &app, [url](QObject *obj, const QUrl &objUrl) {

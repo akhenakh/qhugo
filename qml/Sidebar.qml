@@ -5,18 +5,16 @@ import Qt.labs.folderlistmodel 2.15
 
 Item {
     id: root
-    // This property receives data from Main.qml. Do not assign to it locally!
     property string currentDirectory
     
     signal fileSelected(string path)
-    signal directorySelected(string path) // New signal for folders
+    signal directorySelected(string path)
     signal goUpClicked() 
 
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
         
-        // Header Area
         Rectangle {
             Layout.fillWidth: true
             height: 40
@@ -31,13 +29,9 @@ Item {
                     text: ".."
                     Layout.preferredWidth: 40
                     Layout.fillHeight: true
-                    
-                    // FIX: Use fully qualified enum
                     display: AbstractButton.IconOnly 
-                    
                     onClicked: root.goUpClicked()
                     
-                    // FIX: Add delay to prevent binding loops and annoyance
                     ToolTip.visible: hovered
                     ToolTip.delay: 500
                     ToolTip.text: "Up one level"
@@ -64,7 +58,7 @@ Item {
                 folder: "file://" + root.currentDirectory
                 showDirsFirst: true
                 showDotAndDotDot: false 
-                nameFilters: ["*.md", "*.txt", "*.go", "*.cpp", "*.h", "*.qml"]
+                nameFilters: ["*.md", "*.txt", "*.yaml", "*.toml", "*.json"]
             }
 
             delegate: ItemDelegate {
@@ -74,7 +68,6 @@ Item {
                 
                 onClicked: {
                     if (fileIsDir) {
-                        // FIX: Don't assign locally. Emit signal to restore binding.
                         root.directorySelected(filePath)
                     } else {
                         root.fileSelected(filePath)
