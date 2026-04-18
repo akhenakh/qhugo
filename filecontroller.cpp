@@ -152,7 +152,20 @@ QString FileController::createPost(const QString &repoPath, const QString &title
         localRepo = QUrl(repoPath).toLocalFile();
     }
 
-    QString slug = title.toLower().replace(QRegularExpression("[^a-z0-9]+"), "-");
+    // NFKD-decompose then drop combining marks so accented characters
+    // survive as their base letters: "Olá Mundo" -> "ola-mundo".
+    QString decomposed = title.normalized(QString::NormalizationForm_KD);
+    QString stripped;
+    stripped.reserve(decomposed.size());
+    for (QChar c : decomposed) {
+        if (c.combiningClass() == 0) {
+            stripped.append(c);
+        }
+    }
+    QString slug = stripped.toLower().replace(QRegularExpression("[^a-z0-9]+"), "-");
+    while (slug.startsWith('-')) slug.remove(0, 1);
+    while (slug.endsWith('-')) slug.chop(1);
+    if (slug.isEmpty()) slug = "post";
     QString year = QDateTime::currentDateTime().toString("yyyy");
 
     // Page bundle: create directory named after slug, with index.md inside
