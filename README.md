@@ -17,12 +17,7 @@ A tool specialized to manage and edit Hugo blogs natively.
 
 ## Build
 ```bash
-git submodule update --init --recursive
-cd backend
-go build -buildmode=c-archive
-cd ..
-cmake -B build
-cd build && make
+cmake -S . -B build  && cmake --build build -- -j 10 
 ```
 
 ## LICENSE

@@ -478,19 +478,23 @@ Item {
                                         var textY = drop.y
                                         var insertPosition = textArea.positionAt(textX, textY)
 
-                                        for (var i = 0; i < drop.urls.length; i++) {
-                                            var url = drop.urls[i].toString()
-                                            if (url.match(/\.(jpg|jpeg|png|gif|webp|bmp|tiff?)$/i)) {
-                                                var link = FileController.processImage(url, root.repoPath, tabItem.path)
-                                                if (!link.startsWith("Error")) {
-                                                    textArea.insert(insertPosition, link + "\n")
-                                                    // Update position for next image (if multiple dropped)
-                                                    insertPosition += link.length + 1
-                                                } else {
-                                                    console.error("Image processing error:", link)
-                                                }
-                                            }
-                                        }
+                        for (var i = 0; i < drop.urls.length; i++) {
+                            var url = drop.urls[i].toString()
+                            if (url.match(/\.(jpg|jpeg|png|gif|webp|bmp|tiff?)$/i)) {
+                                var link = FileController.processImage(url, root.repoPath, tabItem.path)
+                                if (!link.startsWith("Error")) {
+                                    textArea.insert(insertPosition, link + "\n")
+                                    insertPosition += link.length + 1
+                                    var currentPath = tabModel.get(tabBar.currentIndex) ? tabModel.get(tabBar.currentIndex).filePath : ""
+                                    if (currentPath !== "") {
+                                        root.onEditorTextChanged(currentPath, textArea.text)
+                                    }
+                                    tabItem.saveTimer.restart()
+                                } else {
+                                    console.error("Image processing error:", link)
+                                }
+                            }
+                        }
                                         drop.accept(Qt.CopyAction)
                                     }
                                 }
