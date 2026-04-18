@@ -14,7 +14,6 @@ A tool specialized to manage and edit Hugo blogs natively.
 
 ## Prerequisites
 - **Hugo**: Ensure `hugo` is installed and available in your system's PATH.
-- **LSP Server** (optional): Install `languagetool-lsp` for spell checking or `marksman` for Markdown intelligence.
 
 ## Build
 ```bash

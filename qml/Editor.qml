@@ -120,16 +120,25 @@ Item {
         TabBar {
             id: tabBar
             Layout.fillWidth: true
-            
+            clip: true
+            background: Rectangle {
+                color: Qt.application.styleHints.colorScheme === Qt.Dark ? "#2a2a2a" : "#f0f0f0"
+            }
+
             onCurrentIndexChanged: root.onTabChanged()
-            
+
             Repeater {
                 model: tabModel
-                
+
                 TabButton {
                     id: tabBtn
-                    width: implicitWidth + 30 
-                    
+                    width: implicitWidth + 30
+                    background: Rectangle {
+                        color: tabBtn.checked
+                            ? (Qt.application.styleHints.colorScheme === Qt.Dark ? "#1e1e1e" : "#ffffff")
+                            : "transparent"
+                    }
+
                     contentItem: RowLayout {
                         spacing: 5
                         Label {
@@ -141,7 +150,7 @@ Item {
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                         }
-                        
+
                         ToolButton {
                             text: "×"
                             font.pixelSize: 16
