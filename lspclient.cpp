@@ -82,10 +82,6 @@ void LspClient::initialize()
     // Initialize LSP manager
     if (LSPInitialize() == 1) {
         m_initialized = true;
-        qDebug() << "LSP client initialized";
-        // Clients will be auto-started when workspace root is set
-    } else {
-        qWarning() << "Failed to initialize LSP client";
     }
 }
 
@@ -99,15 +95,10 @@ void LspClient::cleanup()
 
 void LspClient::setWorkspaceRoot(const QString& root)
 {
-    qDebug() << "[LspClient] setWorkspaceRoot called with:" << root;
     m_workspaceRoot = root;
     if (m_initialized) {
         QByteArray rootUtf8 = root.toUtf8();
-        qDebug() << "[LspClient] Calling LSPSetWorkspaceRoot";
         LSPSetWorkspaceRoot(rootUtf8.data());
-        qDebug() << "[LspClient] LSPSetWorkspaceRoot returned";
-    } else {
-        qDebug() << "[LspClient] Not initialized, skipping";
     }
 }
 
@@ -213,22 +204,18 @@ void LspClient::addServer(const QJsonObject& config)
 {
     QJsonDocument doc(config);
     QByteArray json = doc.toJson(QJsonDocument::Compact);
-    
+
     if (LSPAddServer(json.data()) == 1) {
         emit serverConfigsChanged();
-    } else {
-        qWarning() << "Failed to add LSP server";
     }
 }
 
 void LspClient::removeServer(const QString& name)
 {
     QByteArray nameUtf8 = name.toUtf8();
-    
+
     if (LSPRemoveServer(nameUtf8.data()) == 1) {
         emit serverConfigsChanged();
-    } else {
-        qWarning() << "Failed to remove LSP server";
     }
 }
 
@@ -244,9 +231,6 @@ void LspClient::startClients()
 {
     if (LSPStartClients() == 1) {
         emit clientsRunningChanged();
-        qDebug() << "LSP clients started";
-    } else {
-        qWarning() << "Failed to start LSP clients";
     }
 }
 
@@ -254,7 +238,6 @@ void LspClient::stopClients()
 {
     LSPStopClients();
     emit clientsRunningChanged();
-    qDebug() << "LSP clients stopped";
 }
 
 QJsonArray LspClient::getCurrentDiagnostics() const
@@ -313,6 +296,35 @@ QJsonArray LspClient::getDiagnosticsForLine(int line) const
     return result;
 }
 
+QJsonArray LspClient::getDiagnosticsAtPosition(int line, int character) const
+{
+    QJsonArray result;
+
+    if (m_currentDocumentUri.isEmpty()) {
+        return result;
+    }
+
+    auto it = m_diagnostics.find(m_currentDocumentUri);
+    if (it != m_diagnostics.end()) {
+        for (const auto& diag : it.value()) {
+            if (diag.line == line && character >= diag.character && character < diag.endCharacter) {
+                QJsonObject obj;
+                obj["line"] = diag.line;
+                obj["character"] = diag.character;
+                obj["endLine"] = diag.endLine;
+                obj["endCharacter"] = diag.endCharacter;
+                obj["severity"] = diag.severity;
+                obj["code"] = diag.code;
+                obj["source"] = diag.source;
+                obj["message"] = diag.message;
+                result.append(obj);
+            }
+        }
+    }
+
+    return result;
+}
+
 bool LspClient::hasDiagnosticsForLine(int line) const
 {
     if (m_currentDocumentUri.isEmpty()) {
@@ -360,12 +372,11 @@ QString LspClient::getDiagnosticSeverityColor(int line) const
 // Callback handlers from Go
 void LspClient::handleDiagnostics(const QString& uri, const QJsonArray& diagnostics)
 {
-    qDebug() << "[LspClient] handleDiagnostics called for" << uri << "with" << diagnostics.size() << "items";
     QVector<LSPDiagnostic> diagList;
-    
+
     for (const auto& val : diagnostics) {
         if (!val.isObject()) continue;
-        
+
         QJsonObject obj = val.toObject();
         LSPDiagnostic diag;
         diag.line = obj["line"].toInt();
@@ -376,19 +387,16 @@ void LspClient::handleDiagnostics(const QString& uri, const QJsonArray& diagnost
         diag.code = obj["code"].toString();
         diag.source = obj["source"].toString();
         diag.message = obj["message"].toString();
-        
+
         diagList.append(diag);
     }
-    
+
     m_diagnostics[uri] = diagList;
-    qDebug() << "[LspClient] Stored" << diagList.size() << "diagnostics for" << uri;
-    qDebug() << "[LspClient] Current document URI:" << m_currentDocumentUri;
-    
+
     if (uri == m_currentDocumentUri) {
-        qDebug() << "[LspClient] Emitting diagnosticsChanged signal";
         emit diagnosticsChanged();
     }
-    
+
     emit diagnosticsReceived(uri, diagnostics);
 }
 
@@ -405,21 +413,14 @@ void LspClient::handleLog(const QString& message)
 // Static C callbacks
 void LspClient::diagnosticCallback(const char* uri, const char* jsonDiagnostics)
 {
-    qDebug() << "[LspClient] diagnosticCallback from C called";
     if (s_instance) {
         QString uriStr = QString::fromUtf8(uri);
         QByteArray data(jsonDiagnostics);
-        qDebug() << "[LspClient] Received diagnostics JSON:" << data;
-        
+
         QJsonDocument doc = QJsonDocument::fromJson(data);
         if (doc.isArray()) {
-            qDebug() << "[LspClient] Parsed JSON array, calling handleDiagnostics";
             s_instance->handleDiagnostics(uriStr, doc.array());
-        } else {
-            qDebug() << "[LspClient] Failed to parse JSON as array";
         }
-    } else {
-        qDebug() << "[LspClient] s_instance is null!";
     }
 }
 

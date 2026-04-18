@@ -247,11 +247,11 @@ Item {
             }
         }
 
-                    TextArea {
-                        id: textArea
-                        width: parent.width - lineNumbers.width
-                        text: fileContent
-                        textFormat: TextEdit.PlainText
+    TextArea {
+        id: textArea
+        width: parent.width - lineNumbers.width
+        text: fileContent
+        textFormat: TextEdit.StyledText
 
                         font.family: "Courier New"
                         font.pixelSize: 14
@@ -277,48 +277,61 @@ Item {
                         }
 
                         // Hover handling for LSP
-                        MouseArea {
-                            id: hoverArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            acceptedButtons: Qt.NoButton
-                            propagateComposedEvents: true
+    MouseArea {
+        id: hoverArea
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.NoButton
+        propagateComposedEvents: true
 
-                            property var hoverTimer: Timer {
-                                interval: 300
-                                property int pendingLine: -1
-                                property int pendingCol: -1
-                                onTriggered: {
-                                    if (root.lspClient && root.lspClient.enabled && pendingLine >= 0) {
-                                        root.lspClient.requestHover(root.currentFilePath, pendingLine, pendingCol)
-                                    }
-                                }
-                            }
-
-                            onPositionChanged: function(mouse) {
-                                var pos = textArea.positionAt(mouse.x, mouse.y)
-                                var line = 0
-                                var lineStart = 0
-                                var text = textArea.text
-                                for (var i = 0; i < text.length; i++) {
-                                    if (i === pos) break
-                                    if (text[i] === '\n') {
-                                        line++
-                                        lineStart = i + 1
-                                    }
-                                }
-                                var col = pos - lineStart
-
-                                hoverArea.hoverTimer.pendingLine = line
-                                hoverArea.hoverTimer.pendingCol = col
-                                hoverArea.hoverTimer.restart()
-                            }
-
-                            onExited: {
-                                hoverArea.hoverTimer.stop()
-                                hoverTooltip.hide()
-                            }
+        property var hoverTimer: Timer {
+            interval: 200
+            property int pendingLine: -1
+            property int pendingCol: -1
+            onTriggered: {
+                if (root.lspClient && root.lspClient.enabled && pendingLine >= 0) {
+                    var diags = root.lspClient.getDiagnosticsAtPosition(pendingLine, pendingCol)
+                    if (diags && diags.length > 0) {
+                        var messages = []
+                        for (var i = 0; i < diags.length; i++) {
+                            messages.push(diags[i].message)
                         }
+                        var rect = textArea.cursorRectangle
+                        var pos = textArea.positionAt(hoverArea.mouseX, hoverArea.mouseY)
+                        textArea.cursorPosition = pos
+                        rect = textArea.cursorRectangle
+                        hoverTooltip.show(messages.join("\n\n"), rect.x, rect.y)
+                    } else {
+                        hoverTooltip.hide()
+                    }
+                }
+            }
+        }
+
+        onPositionChanged: function(mouse) {
+            var pos = textArea.positionAt(mouse.x, mouse.y)
+            var line = 0
+            var lineStart = 0
+            var text = textArea.text
+            for (var i = 0; i < text.length; i++) {
+                if (i === pos) break
+                if (text[i] === '\n') {
+                    line++
+                    lineStart = i + 1
+                }
+            }
+            var col = pos - lineStart
+
+            hoverArea.hoverTimer.pendingLine = line
+            hoverArea.hoverTimer.pendingCol = col
+            hoverArea.hoverTimer.restart()
+        }
+
+        onExited: {
+            hoverArea.hoverTimer.stop()
+            hoverTooltip.hide()
+        }
+    }
 
                         MarkdownHighlighter {
                             id: highlighter

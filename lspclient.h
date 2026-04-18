@@ -84,8 +84,9 @@ public:
     // Diagnostics
     Q_INVOKABLE QJsonArray getCurrentDiagnostics() const;
     Q_INVOKABLE QJsonArray getDiagnosticsForLine(int line) const;
+    Q_INVOKABLE QJsonArray getDiagnosticsAtPosition(int line, int character) const;
     Q_INVOKABLE bool hasDiagnosticsForLine(int line) const;
-    Q_INVOKABLE QString getDiagnosticSeverityColor(int line) const;  // Returns "error", "warning", "info", or empty
+    Q_INVOKABLE QString getDiagnosticSeverityColor(int line) const; // Returns "error", "warning", "info", or empty
 
     // Callbacks from Go (called by C callbacks)
     void handleDiagnostics(const QString& uri, const QJsonArray& diagnostics);

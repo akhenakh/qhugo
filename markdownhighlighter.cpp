@@ -498,6 +498,9 @@ void MarkdownHighlighter::applyDiagnostics(const QString &text, int blockNumber,
 {
     Q_UNUSED(blockStart);
 
+    if (m_diagnostics.isEmpty())
+        return;
+
     for (const auto &diag : m_diagnostics) {
         int diagStartLine = diag.startLine;
         int diagEndLine = diag.endLine;
@@ -508,37 +511,27 @@ void MarkdownHighlighter::applyDiagnostics(const QString &text, int blockNumber,
         int startCol = (blockNumber == diagStartLine) ? diag.startColumn : 0;
         int endCol = (blockNumber == diagEndLine) ? diag.endColumn : text.length();
 
-        // Clamp to text length just in case
         if (startCol < 0) startCol = 0;
         if (endCol > text.length()) endCol = text.length();
 
-        // In LSP, a diagnostic can span 0 characters, but we need at least 1 character to show an underline.
         if (startCol == endCol && startCol < text.length()) {
             endCol = startCol + 1;
         }
 
         if (startCol < endCol) {
-            QTextCharFormat diagnosticFormat;
-            diagnosticFormat.setUnderlineStyle(QTextCharFormat::SpellCheckUnderline);
-
+            QColor underlineColor;
             switch (diag.severity) {
-            case 1:  // Error
-                diagnosticFormat.setUnderlineColor(QColor("#e06c75"));
-                break;
-            case 2:  // Warning
-                diagnosticFormat.setUnderlineColor(QColor("#e5c07b"));
-                break;
-            case 3:  // Info
-                diagnosticFormat.setUnderlineColor(QColor("#61afef"));
-                break;
-            case 4:  // Hint
-            default:
-                diagnosticFormat.setUnderlineColor(QColor("#98c379"));
-                break;
+            case 1: underlineColor = QColor("#e06c75"); break;
+            case 2: underlineColor = QColor("#e5c07b"); break;
+            case 3: underlineColor = QColor("#61afef"); break;
+            default: underlineColor = QColor("#98c379"); break;
             }
 
-            // Using QSyntaxHighlighter::setFormat merges the squiggly underline gracefully with the base formats.
-            setFormat(startCol, endCol - startCol, diagnosticFormat);
+            for (int i = startCol; i < endCol; ++i) {
+                QTextCharFormat existingFormat = format(i);
+                existingFormat.setBackground(QColor(underlineColor.red(), underlineColor.green(), underlineColor.blue(), 40));
+                setFormat(i, 1, existingFormat);
+            }
         }
     }
 }
