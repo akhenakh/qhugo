@@ -99,27 +99,25 @@ func NewManager(configPath string, onDiagnostics, onLog func(uri string, diagnos
 
 // LoadConfig loads LSP configuration from file
 func (m *Manager) LoadConfig() error {
-	log.Printf("[LSP Manager] Loading config from: %s", m.configPath)
+	dlog("[LSP Manager] Loading config from: %s", m.configPath)
 	data, err := os.ReadFile(m.configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Printf("[LSP Manager] Config file not found, using defaults")
+			dlog("[LSP Manager] Config file not found, using defaults")
 			m.config = DefaultConfig()
 			return m.SaveConfig()
 		}
 		return err
 	}
 
-	log.Printf("[LSP Manager] Config file content: %s", string(data))
-	
 	var config Config
 	if err := json.Unmarshal(data, &config); err != nil {
-		log.Printf("[LSP Manager] Failed to parse config: %v", err)
+		dlog("[LSP Manager] Failed to parse config: %v", err)
 		return err
 	}
 
 	m.config = &config
-	log.Printf("[LSP Manager] Config loaded: enabled=%v, servers=%d", config.Enabled, len(config.Servers))
+	dlog("[LSP Manager] Config loaded: enabled=%v, servers=%d", config.Enabled, len(config.Servers))
 	
 	// Set debounce delay
 	if config.Debounce > 0 {
@@ -175,7 +173,7 @@ func (m *Manager) StartClients() error {
 	
 	// Don't start if workspace root is not set
 	if m.workspaceRoot == "" {
-		log.Printf("[LSP Manager] Not starting clients - workspace root not set")
+		dlog("[LSP Manager] Not starting clients - workspace root not set")
 		return nil
 	}
 
@@ -285,7 +283,7 @@ func (m *Manager) DocumentOpened(uri, languageID, content string) {
 
 // DocumentChanged notifies all LSP clients of document changes (debounced)
 func (m *Manager) DocumentChanged(uri, content string) {
-	log.Printf("[LSP Manager] DocumentChanged called for %s (content length: %d)", uri, len(content))
+	dlog("[LSP Manager] DocumentChanged called for %s (content length: %d)", uri, len(content))
 	
 	// Update document info
 	m.docMu.Lock()
@@ -293,7 +291,7 @@ func (m *Manager) DocumentChanged(uri, content string) {
 	if !exists {
 		doc = &DocumentInfo{URI: uri, Version: 0}
 		m.documents[uri] = doc
-		log.Printf("[LSP Manager] Created new document entry for %s", uri)
+		dlog("[LSP Manager] Created new document entry for %s", uri)
 	}
 	doc.Content = content
 	doc.Version++
@@ -304,12 +302,12 @@ func (m *Manager) DocumentChanged(uri, content string) {
 	m.debounceMu.Lock()
 	if timer, exists := m.debounceTimers[uri]; exists {
 		timer.Stop()
-		log.Printf("[LSP Manager] Stopped existing debounce timer for %s", uri)
+		dlog("[LSP Manager] Stopped existing debounce timer for %s", uri)
 	}
 	
-	log.Printf("[LSP Manager] Starting debounce timer for %s (delay: %v)", uri, m.debounceDelay)
+	dlog("[LSP Manager] Starting debounce timer for %s (delay: %v)", uri, m.debounceDelay)
 	m.debounceTimers[uri] = time.AfterFunc(m.debounceDelay, func() {
-		log.Printf("[LSP Manager] Debounce timer fired for %s", uri)
+		dlog("[LSP Manager] Debounce timer fired for %s", uri)
 		m.sendDocumentChange(uri, content)
 		
 		m.debounceMu.Lock()
@@ -321,7 +319,7 @@ func (m *Manager) DocumentChanged(uri, content string) {
 
 // sendDocumentChange sends the actual didChange notification
 func (m *Manager) sendDocumentChange(uri, content string) {
-	log.Printf("[LSP Manager] sendDocumentChange called for %s", uri)
+	dlog("[LSP Manager] sendDocumentChange called for %s", uri)
 	m.clientsMu.RLock()
 	clientCount := len(m.clients)
 	clients := make(map[string]*Client)
@@ -329,7 +327,7 @@ func (m *Manager) sendDocumentChange(uri, content string) {
 		clients[name] = client
 	}
 	m.clientsMu.RUnlock()
-	log.Printf("[LSP Manager] Sending didChange to %d clients", clientCount)
+	dlog("[LSP Manager] Sending didChange to %d clients", clientCount)
 
 	for _, client := range clients {
 		go func(c *Client) {
@@ -433,12 +431,12 @@ func (m *Manager) RemoveServer(name string) error {
 
 // handleDiagnostics processes diagnostics from LSP servers
 func (m *Manager) handleDiagnostics(uri string, diagnostics []Diagnostic) {
-	log.Printf("[LSP Manager] handleDiagnostics called for %s with %d diagnostics", uri, len(diagnostics))
+	dlog("[LSP Manager] handleDiagnostics called for %s with %d diagnostics", uri, len(diagnostics))
 	if m.onDiagnostics != nil {
-		log.Printf("[LSP Manager] Calling onDiagnostics callback")
+		dlog("[LSP Manager] Calling onDiagnostics callback")
 		m.onDiagnostics(uri, diagnostics)
 	} else {
-		log.Printf("[LSP Manager] onDiagnostics callback is nil!")
+		dlog("[LSP Manager] onDiagnostics callback is nil!")
 	}
 }
 
@@ -458,12 +456,12 @@ func (m *Manager) getWorkspaceRoot() string {
 
 // SetWorkspaceRoot sets the workspace root for LSP clients
 func (m *Manager) SetWorkspaceRoot(root string) {
-	log.Printf("[LSP Manager] SetWorkspaceRoot called: %s", root)
+	dlog("[LSP Manager] SetWorkspaceRoot called: %s", root)
 	m.workspaceRoot = root
 	
 	// If LSP is enabled and no clients are running, start them now
 	if m.IsEnabled() && len(m.clients) == 0 {
-		log.Printf("[LSP Manager] Auto-starting clients after workspace root set")
+		dlog("[LSP Manager] Auto-starting clients after workspace root set")
 		m.StartClients()
 	}
 }

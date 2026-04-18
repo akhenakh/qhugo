@@ -147,11 +147,11 @@ func NewClient(config ClientConfig, onDiagnostic func(uri string, diagnostics []
 		pending:     make(map[int]chan *ResponseMessage),
 	}
 
-	log.Printf("[LSP Client] Client created, starting readMessages goroutine...")
+	dlog("[LSP Client] Client created, starting readMessages goroutine...")
 	// Start message reader and stderr logger
 	go client.readMessages()
 	go client.logStderr()
-	log.Printf("[LSP Client] Goroutines started")
+	dlog("[LSP Client] Goroutines started")
 
 	return client, nil
 }
@@ -277,12 +277,12 @@ func (c *Client) DidOpen(uri, languageID, content string) error {
 
 // DidChange sends textDocument/didChange notification with debouncing
 func (c *Client) DidChange(uri, content string) error {
-	log.Printf("[LSP Client] DidChange called for %s", uri)
+	dlog("[LSP Client] DidChange called for %s", uri)
 	c.docMu.Lock()
 	doc, ok := c.documents[uri]
 	if !ok {
 		c.docMu.Unlock()
-		log.Printf("[LSP Client] DidChange failed: document not open %s", uri)
+		dlog("[LSP Client] DidChange failed: document not open %s", uri)
 		return fmt.Errorf("document not open: %s", uri)
 	}
 
@@ -290,7 +290,7 @@ func (c *Client) DidChange(uri, content string) error {
 	doc.Content = content
 	version := doc.Version
 	c.docMu.Unlock()
-	log.Printf("[LSP Client] Document %s now at version %d", uri, version)
+	dlog("[LSP Client] Document %s now at version %d", uri, version)
 
 	// Full document sync for simplicity
 	params := DidChangeTextDocumentParams{
@@ -303,12 +303,12 @@ func (c *Client) DidChange(uri, content string) error {
 		},
 	}
 
-	log.Printf("[LSP Client] Sending textDocument/didChange notification...")
+	dlog("[LSP Client] Sending textDocument/didChange notification...")
 	err := c.sendNotification("textDocument/didChange", params)
 	if err != nil {
-		log.Printf("[LSP Client] Failed to send didChange: %v", err)
+		dlog("[LSP Client] Failed to send didChange: %v", err)
 	} else {
-		log.Printf("[LSP Client] didChange notification sent successfully")
+		dlog("[LSP Client] didChange notification sent successfully")
 	}
 	return err
 }
@@ -447,7 +447,7 @@ func (c *Client) writeMessage(msg interface{}) error {
 
 	// LSP message format: Content-Length: <len>\r\n\r\n<json>
 	header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(data))
-	log.Printf("[LSP Client] Writing message: %s%s", header, string(data))
+	dlog("[LSP Client] Writing message (%d bytes)", len(data))
 
 	if _, err := c.stdin.Write([]byte(header)); err != nil {
 		return fmt.Errorf("failed to write header: %w", err)
@@ -459,7 +459,7 @@ func (c *Client) writeMessage(msg interface{}) error {
 	// Try to flush if possible
 	if flusher, ok := c.stdin.(interface{ Flush() error }); ok {
 		if err := flusher.Flush(); err != nil {
-			log.Printf("[LSP Client] Failed to flush: %v", err)
+			dlog("[LSP Client] Failed to flush: %v", err)
 		}
 	}
 
@@ -468,7 +468,7 @@ func (c *Client) writeMessage(msg interface{}) error {
 
 // readMessages reads and processes messages from the LSP server
 func (c *Client) readMessages() {
-	log.Printf("[LSP Client] readMessages goroutine started for client")
+	dlog("[LSP Client] readMessages goroutine started for client")
 	for {
 		msg, err := c.readMessage()
 		if err != nil {
@@ -481,7 +481,7 @@ func (c *Client) readMessages() {
 
 		switch m := msg.(type) {
 		case *ResponseMessage:
-			log.Printf("[LSP Client] Received response ID=%d", m.ID)
+			dlog("[LSP Client] Received response ID=%d", m.ID)
 			c.pendingMu.Lock()
 			ch, ok := c.pending[m.ID]
 			if ok {
@@ -493,8 +493,7 @@ func (c *Client) readMessages() {
 			}
 
 	case *NotificationMessage:
-		log.Printf("[LSP Client] Received notification: %s", m.Method)
-		log.Printf("[LSP Client] Notification params: %s", string(m.Params))
+		dlog("[LSP Client] Received notification: %s", m.Method)
 		c.handleNotification(m)
 		}
 	}
@@ -504,14 +503,14 @@ func (c *Client) readMessages() {
 func (c *Client) readMessage() (interface{}, error) {
 	// Read headers
 	contentLength := -1
-	log.Printf("[LSP Client] Waiting to read message from server...")
+	dlog("[LSP Client] Waiting to read message from server...")
 	for {
 		line, err := c.reader.ReadString('\n')
 		if err != nil {
-			log.Printf("[LSP Client] ReadString error: %v", err)
+			dlog("[LSP Client] ReadString error: %v", err)
 			return nil, err
 		}
-		log.Printf("[LSP Client] Read header line: %q", line)
+		dlog("[LSP Client] Read header line: %q", line)
 
 		line = line[:len(line)-2] // Remove \r\n
 		if line == "" {
@@ -532,7 +531,7 @@ func (c *Client) readMessage() (interface{}, error) {
 	if _, err := io.ReadFull(c.reader, data); err != nil {
 		return nil, err
 	}
-	log.Printf("[LSP Client] Read message content (%d bytes): %s", contentLength, string(data))
+	dlog("[LSP Client] Read message content (%d bytes)", contentLength)
 
 	// Parse message
 	var base struct {
@@ -565,18 +564,18 @@ func (c *Client) readMessage() (interface{}, error) {
 func (c *Client) handleNotification(ntf *NotificationMessage) {
 	switch ntf.Method {
 	case "textDocument/publishDiagnostics":
-		log.Printf("[LSP Client] Received publishDiagnostics notification")
+		dlog("[LSP Client] Received publishDiagnostics notification")
 		var params PublishDiagnosticsParams
 		if err := json.Unmarshal(ntf.Params, &params); err != nil {
 			log.Printf("Failed to unmarshal diagnostics: %v", err)
 			return
 		}
-		log.Printf("[LSP Client] Diagnostics for %s: %d items", params.URI, len(params.Diagnostics))
+		dlog("[LSP Client] Diagnostics for %s: %d items", params.URI, len(params.Diagnostics))
 		if c.onDiagnostic != nil {
-			log.Printf("[LSP Client] Calling onDiagnostic callback")
+			dlog("[LSP Client] Calling onDiagnostic callback")
 			c.onDiagnostic(params.URI, params.Diagnostics)
 		} else {
-			log.Printf("[LSP Client] onDiagnostic callback is nil!")
+			dlog("[LSP Client] onDiagnostic callback is nil!")
 		}
 
 	case "window/showMessage":

@@ -43,6 +43,15 @@ import (
 	"golang.org/x/image/draw"
 )
 
+// debugEnabled gates chatty scaffolding logs. Set QHUGO_DEBUG=1 to enable.
+var debugEnabled = os.Getenv("QHUGO_DEBUG") != ""
+
+func dlog(format string, args ...any) {
+	if debugEnabled {
+		log.Printf(format, args...)
+	}
+}
+
 // Config represents the qhugo configuration file
 type Config struct {
 	Sites   []string `json:"sites"`
@@ -384,7 +393,7 @@ func LSPSetCallbacks(diagnosticCb, hoverCb, logCb unsafe.Pointer) {
 
 // handleDiagnostics forwards diagnostics to C++
 func handleDiagnostics(uri string, diagnostics []lsp.Diagnostic) {
-	log.Printf("[Backend] handleDiagnostics called for %s with %d diagnostics", uri, len(diagnostics))
+	dlog("[Backend] handleDiagnostics called for %s with %d diagnostics", uri, len(diagnostics))
 	// Convert diagnostics to JSON
 	type diagnosticJSON struct {
 		Line      int    `json:"line"`
@@ -419,9 +428,9 @@ func handleDiagnostics(uri string, diagnostics []lsp.Diagnostic) {
 	defer C.free(unsafe.Pointer(uriC))
 	defer C.free(unsafe.Pointer(dataC))
 
-	log.Printf("[Backend] Calling C.callDiagnosticCallback with %d diagnostics", len(jsonDiags))
+	dlog("[Backend] Calling C.callDiagnosticCallback with %d diagnostics", len(jsonDiags))
 	C.callDiagnosticCallback(uriC, dataC)
-	log.Printf("[Backend] C.callDiagnosticCallback completed")
+	dlog("[Backend] C.callDiagnosticCallback completed")
 }
 
 // handleHover forwards hover results to C++
@@ -448,18 +457,18 @@ func LSPInitialize() int {
 	}
 
 	configPath := getLSPConfigPath()
-	log.Printf("[Backend] LSPInitialize called, config path: %s", configPath)
+	dlog("[Backend] LSPInitialize called, config path: %s", configPath)
 
 	lspManager = lsp.NewManager(configPath, handleDiagnostics, handleLog, handleHover)
 
 	if err := lspManager.LoadConfig(); err != nil {
-		log.Printf("[Backend] Failed to load LSP config: %v", err)
+		dlog("[Backend] Failed to load LSP config: %v", err)
 		// Continue with default config
 	} else {
-		log.Printf("[Backend] LSP config loaded successfully")
+		dlog("[Backend] LSP config loaded successfully")
 	}
 
-	log.Printf("[Backend] LSP enabled: %v", lspManager.IsEnabled())
+	dlog("[Backend] LSP enabled: %v", lspManager.IsEnabled())
 
 	return 1
 }
@@ -497,13 +506,13 @@ func LSPDocumentOpened(uriC, languageIDC, contentC *C.char) {
 //export LSPDocumentChanged
 func LSPDocumentChanged(uriC, contentC *C.char) {
 	if lspManager == nil {
-		log.Printf("[Backend] LSPDocumentChanged: lspManager is nil!")
+		dlog("[Backend] LSPDocumentChanged: lspManager is nil!")
 		return
 	}
 
 	uri := C.GoString(uriC)
 	content := C.GoString(contentC)
-	log.Printf("[Backend] LSPDocumentChanged called for %s (content length: %d)", uri, len(content))
+	dlog("[Backend] LSPDocumentChanged called for %s (content length: %d)", uri, len(content))
 
 	lspManager.DocumentChanged(uri, content)
 }
