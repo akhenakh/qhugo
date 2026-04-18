@@ -6,13 +6,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Quick Gui QuickControls2 WebEngineQuick)
 
+# Collect all Go source files in backend directory
+file(GLOB_RECURSE GO_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/backend/*.go")
+file(GLOB_RECURSE GO_MOD_FILES "${CMAKE_CURRENT_SOURCE_DIR}/backend/go.mod" "${CMAKE_CURRENT_SOURCE_DIR}/backend/go.sum")
+
 # Build Go Backend
 add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/backend/backend.a ${CMAKE_CURRENT_SOURCE_DIR}/backend/backend.h
-    COMMAND go mod tidy && go build -buildmode=c-archive -o backend.a backend.go
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/backend/backend.go
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/backend
-    COMMENT "Building Go backend..."
+OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/backend/backend.a ${CMAKE_CURRENT_SOURCE_DIR}/backend/backend.h
+COMMAND go build -buildmode=c-archive -o backend.a backend.go
+DEPENDS ${GO_SOURCES} ${GO_MOD_FILES}
+WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/backend
+COMMENT "Building Go backend..."
 )
 
 add_custom_target(go_backend DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/backend/backend.a)
