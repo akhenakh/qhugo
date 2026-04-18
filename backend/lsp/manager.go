@@ -157,10 +157,10 @@ func (m *Manager) SetEnabled(enabled bool) error {
 	}
 
 	if enabled {
-		// Don't auto-start clients here - wait for workspace root to be set
-		// return m.StartClients()
+		// StartClients is a no-op until the workspace root is set;
+		// SetWorkspaceRoot will call it again once the root arrives.
+		return m.StartClients()
 	}
-	
 	m.StopClients()
 	return nil
 }
