@@ -39,8 +39,8 @@ import (
 	"strings"
 	"unsafe"
 
+	"github.com/akhenakh/qhugo/backend/lsp"
 	"golang.org/x/image/draw"
-	"github.com/akhenakh/qtmarkdown/backend/lsp"
 )
 
 // Config represents the qhugo configuration file
@@ -449,16 +449,16 @@ func LSPInitialize() int {
 
 	configPath := getLSPConfigPath()
 	log.Printf("[Backend] LSPInitialize called, config path: %s", configPath)
-	
+
 	lspManager = lsp.NewManager(configPath, handleDiagnostics, handleLog, handleHover)
-	
+
 	if err := lspManager.LoadConfig(); err != nil {
 		log.Printf("[Backend] Failed to load LSP config: %v", err)
 		// Continue with default config
 	} else {
 		log.Printf("[Backend] LSP config loaded successfully")
 	}
-	
+
 	log.Printf("[Backend] LSP enabled: %v", lspManager.IsEnabled())
 
 	return 1
@@ -486,11 +486,11 @@ func LSPDocumentOpened(uriC, languageIDC, contentC *C.char) {
 	if lspManager == nil {
 		return
 	}
-	
+
 	uri := C.GoString(uriC)
 	languageID := C.GoString(languageIDC)
 	content := C.GoString(contentC)
-	
+
 	lspManager.DocumentOpened(uri, languageID, content)
 }
 
@@ -500,11 +500,11 @@ func LSPDocumentChanged(uriC, contentC *C.char) {
 		log.Printf("[Backend] LSPDocumentChanged: lspManager is nil!")
 		return
 	}
-	
+
 	uri := C.GoString(uriC)
 	content := C.GoString(contentC)
 	log.Printf("[Backend] LSPDocumentChanged called for %s (content length: %d)", uri, len(content))
-	
+
 	lspManager.DocumentChanged(uri, content)
 }
 
@@ -513,7 +513,7 @@ func LSPDocumentClosed(uriC *C.char) {
 	if lspManager == nil {
 		return
 	}
-	
+
 	uri := C.GoString(uriC)
 	lspManager.DocumentClosed(uri)
 }
@@ -523,7 +523,7 @@ func LSPRequestHover(uriC *C.char, line, character int) {
 	if lspManager == nil {
 		return
 	}
-	
+
 	uri := C.GoString(uriC)
 	lspManager.Hover(uri, line, character)
 }
@@ -533,7 +533,7 @@ func LSPIsEnabled() int {
 	if lspManager == nil {
 		return 0
 	}
-	
+
 	if lspManager.IsEnabled() {
 		return 1
 	}
@@ -545,7 +545,7 @@ func LSPSetEnabled(enabled int) int {
 	if lspManager == nil {
 		return 0
 	}
-	
+
 	if err := lspManager.SetEnabled(enabled == 1); err != nil {
 		log.Printf("Failed to set LSP enabled: %v", err)
 		return 0
@@ -558,7 +558,7 @@ func LSPStartClients() int {
 	if lspManager == nil {
 		return 0
 	}
-	
+
 	if err := lspManager.StartClients(); err != nil {
 		log.Printf("Failed to start LSP clients: %v", err)
 		return 0
@@ -571,7 +571,7 @@ func LSPStopClients() {
 	if lspManager == nil {
 		return
 	}
-	
+
 	lspManager.StopClients()
 }
 
@@ -580,7 +580,7 @@ func LSPGetServers() *C.char {
 	if lspManager == nil {
 		return C.CString("[]")
 	}
-	
+
 	servers := lspManager.GetServers()
 	data, err := json.Marshal(servers)
 	if err != nil {
@@ -594,15 +594,15 @@ func LSPAddServer(jsonConfigC *C.char) int {
 	if lspManager == nil {
 		return 0
 	}
-	
+
 	jsonConfig := C.GoString(jsonConfigC)
-	
+
 	var server lsp.ServerConfig
 	if err := json.Unmarshal([]byte(jsonConfig), &server); err != nil {
 		log.Printf("Failed to parse server config: %v", err)
 		return 0
 	}
-	
+
 	if err := lspManager.AddServer(server); err != nil {
 		log.Printf("Failed to add server: %v", err)
 		return 0
@@ -615,9 +615,9 @@ func LSPRemoveServer(nameC *C.char) int {
 	if lspManager == nil {
 		return 0
 	}
-	
+
 	name := C.GoString(nameC)
-	
+
 	if err := lspManager.RemoveServer(name); err != nil {
 		log.Printf("Failed to remove server: %v", err)
 		return 0
@@ -630,10 +630,10 @@ func LSPSetServerEnabled(nameC *C.char, enabled int) int {
 	if lspManager == nil {
 		return 0
 	}
-	
+
 	name := C.GoString(nameC)
 	servers := lspManager.GetServers()
-	
+
 	for i, s := range servers {
 		if s.Name == name {
 			servers[i].Enabled = (enabled == 1)
@@ -641,7 +641,7 @@ func LSPSetServerEnabled(nameC *C.char, enabled int) int {
 			break
 		}
 	}
-	
+
 	return 1
 }
 

@@ -1,4 +1,4 @@
-module github.com/akhenakh/qtmarkdown/backend
+module github.com/akhenakh/qhugo/backend
 
 go 1.25.5
 
