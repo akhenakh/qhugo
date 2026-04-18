@@ -80,13 +80,20 @@ Item {
 
     function closeTab(index) {
         if (index < 0 || index >= tabModel.count) return;
-        
-        // Notify LSP about document closure
+
+        // Save before closing
         var item = tabModel.get(index)
+        var stackItem = stackLayout.children[index]
+        if (stackItem && stackItem.editor && stackItem.saveTimer) {
+            stackItem.saveTimer.stop()
+            FileController.saveFile(item.filePath, stackItem.editor.text)
+        }
+
+        // Notify LSP about document closure
         if (lspClient && lspClient.enabled && item && item.filePath) {
             lspClient.documentClosed(item.filePath)
         }
-        
+
         tabModel.remove(index);
         if (tabBar.currentIndex >= tabModel.count) {
             tabBar.currentIndex = tabModel.count - 1;
@@ -159,27 +166,25 @@ Item {
             Repeater {
                 model: tabModel
                 
-                Item {
-                    id: tabItem
-                    property string path: filePath
-                    property var editor: textArea
+    Item {
+        id: tabItem
+        property string path: filePath
+        property var editor: textArea
 
-                    ColumnLayout {
-                        anchors.fill: parent
-                        
-                        // Toolbar
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Layout.margins: 5
-                            Button {
-                                text: "Save"
-                                onClicked: root.saveCurrentTab()
-                            }
-                            Item { Layout.fillWidth: true }
-                        }
+        // Auto-save debounce timer
+        property var saveTimer: Timer {
+            interval: 500
+            onTriggered: {
+                FileController.saveFile(path, textArea.text)
+                root.contentSaved()
+            }
+        }
 
-                        // Editor Area
-                        ScrollView {
+        ColumnLayout {
+            anchors.fill: parent
+
+            // Editor Area
+            ScrollView {
                             id: scrollView
                             Layout.fillWidth: true
                             Layout.fillHeight: true
@@ -268,13 +273,18 @@ Item {
 
                         color: Qt.application.styleHints.colorScheme === Qt.Dark ? "white" : "black"
 
-                        // Notify LSP on user edits (not programmatic changes)
-                        onTextEdited: {
-                            var currentPath = tabModel.get(tabBar.currentIndex) ? tabModel.get(tabBar.currentIndex).filePath : ""
-                            if (currentPath !== "") {
-                                root.onEditorTextChanged(currentPath, text)
-                            }
-                        }
+            // Notify LSP on user edits (not programmatic changes)
+            onTextEdited: {
+                var currentPath = tabModel.get(tabBar.currentIndex) ? tabModel.get(tabBar.currentIndex).filePath : ""
+                if (currentPath !== "") {
+                    root.onEditorTextChanged(currentPath, text)
+                }
+                // Trigger auto-save debounce
+                var currentItem = stackLayout.children[tabBar.currentIndex]
+                if (currentItem && currentItem.saveTimer) {
+                    currentItem.saveTimer.restart()
+                }
+            }
 
                         // Hover handling for LSP
     MouseArea {
