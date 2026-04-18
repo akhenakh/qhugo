@@ -1,1 +1,4 @@
 build/
+backend/backend.a
+backend/backend.h
+backend/libbackend.h
