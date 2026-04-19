@@ -1,0 +1,192 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux AMD64
+          - os: ubuntu-24.04
+            arch: amd64
+            platform: linux
+            ext: ""
+            qt_arch: linux_gcc_64
+          # Linux ARM64 (using native ARM runner)
+          - os: ubuntu-24.04-arm
+            arch: arm64
+            platform: linux
+            ext: ""
+            qt_arch: linux_gcc_64
+          # macOS AMD64 (Intel)
+          - os: macos-13
+            arch: amd64
+            platform: macos
+            ext: ""
+            qt_arch: clang_64
+          # macOS ARM64 (Apple Silicon)
+          - os: macos-14
+            arch: arm64
+            platform: macos
+            ext: ""
+            qt_arch: clang_64
+          # Windows AMD64
+          - os: windows-latest
+            arch: amd64
+            platform: windows
+            ext: ".exe"
+            qt_arch: win64_mingw
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache-dependency-path: backend/go.sum
+
+      - name: Install Qt6 (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            qt6-base-dev \
+            qt6-declarative-dev \
+            qt6-webengine-dev \
+            libgl1-mesa-dev \
+            build-essential \
+            cmake
+
+      - name: Install Qt6 (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          brew install qt@6 cmake
+          echo "$(brew --prefix qt@6)/bin" >> $GITHUB_PATH
+
+      - name: Install Qt6 (Windows)
+        if: matrix.platform == 'windows'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.2"
+          arch: ${{ matrix.qt_arch }}
+          modules: qtwebengine
+          cache: true
+
+      - name: Build Go Backend (Linux/macOS)
+        if: matrix.platform != 'windows'
+        working-directory: backend
+        run: |
+          go build -buildmode=c-archive -o backend.a backend.go
+
+      - name: Build Go Backend (Windows)
+        if: matrix.platform == 'windows'
+        working-directory: backend
+        shell: pwsh
+        run: |
+          $env:GOARCH = "amd64"
+          go build -buildmode=c-archive -o backend.a backend.go
+
+      - name: Configure CMake (Linux/macOS)
+        if: matrix.platform != 'windows'
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch == 'arm64' && 'arm64' || 'x86_64' }}
+
+      - name: Configure CMake (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Application (Linux/macOS)
+        if: matrix.platform != 'windows'
+        run: cmake --build build --config Release -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+      - name: Build Application (Windows)
+        if: matrix.platform == 'windows'
+        run: cmake --build build --config Release
+
+      - name: Package Binary (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          mkdir -p dist/qhugo
+          cp build/appQHugo dist/qhugo/qhugo${{ matrix.ext }}
+          cp -r qml dist/qhugo/ || true
+          cd dist
+          tar czf qhugo-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz qhugo/
+
+      - name: Package Binary (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          mkdir -p dist/qhugo
+          cp build/appQHugo dist/qhugo/qhugo${{ matrix.ext }}
+          cp -r qml dist/qhugo/ || true
+          # Create app bundle structure
+          cd dist
+          tar czf qhugo-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz qhugo/
+
+      - name: Package Binary (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/qhugo
+          Copy-Item build/Release/appQHugo.exe dist/qhugo/qhugo.exe
+          Copy-Item -Recurse qml dist/qhugo/ -ErrorAction SilentlyContinue
+          # Copy Qt dependencies
+          $QtDir = "${env:Qt6_DIR}"
+          if (Test-Path "$QtDir/bin") {
+            Get-ChildItem "$QtDir/bin/*.dll" | Copy-Item -Destination dist/qhugo/ -ErrorAction SilentlyContinue
+          }
+          # Find and copy Qt6 dlls
+          $QtBin = Get-Command qmake6 -ErrorAction SilentlyContinue
+          if ($QtBin) {
+            $QtPath = Split-Path $QtBin.Source
+            Get-ChildItem "$QtPath/Qt6*.dll" | Copy-Item -Destination dist/qhugo/ -ErrorAction SilentlyContinue
+          }
+          cd dist
+          Compress-Archive -Path qhugo -DestinationPath "qhugo-${{ matrix.platform }}-${{ matrix.arch }}.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qhugo-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/qhugo-*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: qhugo-*
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
