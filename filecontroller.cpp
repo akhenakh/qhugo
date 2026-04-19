@@ -12,6 +12,8 @@
 #include <QDesktopServices>
 #include <QFile>
 #include <QDir>
+#include <QList>
+#include <QFileInfoList>
 
 FileController::FileController(QObject *parent) : QObject(parent) {
     InitBackend(); // Initialize Go runtime
@@ -38,33 +40,41 @@ QStringList FileController::scanDirectory(const QString &path) {
     }
 
     QStringList fileList;
-    QDir dir(localPath);
-    if (!dir.exists()) {
+    QDir rootDir(localPath);
+    if (!rootDir.exists()) {
         return fileList;
     }
 
-    QDirIterator it(localPath, QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    // Use a manual queue for directory traversal to cleanly skip heavy directories.
+    // QDirIterator::Subdirectories traverses everything before we can filter it,
+    // which causes massive I/O spikes on .git or node_modules folders.
+    QList<QDir> dirsToProcess;
+    dirsToProcess.append(rootDir);
 
-    while (it.hasNext()) {
-        QString filePath = it.next();
+    int count = 0;
+    while (!dirsToProcess.isEmpty() && count < 20000) {
+        QDir currentDir = dirsToProcess.takeFirst();
+        QFileInfoList entries = currentDir.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
 
-        // Skip heavy folders and build artifacts
-        if (filePath.contains("/.git/") ||
-            filePath.contains("/node_modules/") ||
-            filePath.contains("/public/") ||
-            filePath.contains("/resources/")) {
-            continue;
-        }
-
-        // Only index markdown files in FuzzyFinder
-        if (!filePath.endsWith(".md")) {
-            continue;
-        }
-
-        fileList.append(filePath);
-
-        if (fileList.size() >= 20000) {
-            break;
+        for (const QFileInfo &info : entries) {
+            if (info.isDir()) {
+                QString dirName = info.fileName();
+                // Skip heavy folders and build artifacts completely
+                if (dirName == ".git" ||
+                    dirName == "node_modules" ||
+                    dirName == "public" ||
+                    dirName == "resources") {
+                    continue;
+                }
+                dirsToProcess.append(QDir(info.absoluteFilePath()));
+            } else {
+                // Only index markdown files in FuzzyFinder
+                if (info.suffix() == "md") {
+                    fileList.append(info.absoluteFilePath());
+                    count++;
+                    if (count >= 20000) break;
+                }
+            }
         }
     }
 

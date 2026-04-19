@@ -324,6 +324,7 @@ void MarkdownHighlighter::highlightSyntax(const QString &text)
                       text.at(i + word.size()) != QLatin1Char('_')))) {
                     setFormat(i, word.size(), fmt);
                     i += word.size();
+                    break;
                 }
             }
         }

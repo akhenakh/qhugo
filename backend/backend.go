@@ -269,6 +269,12 @@ func StartHugo(repoC *C.char) int {
 	if hugoCmd != nil && hugoCmd.Process != nil {
 		log.Println("Killing existing Hugo server")
 		hugoCmd.Process.Kill()
+
+		// Clean up the previous process before starting the new one
+		go func(cmd *exec.Cmd) {
+			cmd.Wait()
+		}(hugoCmd)
+
 		hugoCmd = nil
 	}
 
@@ -308,6 +314,13 @@ func StartHugo(repoC *C.char) int {
 func StopHugo() {
 	if hugoCmd != nil && hugoCmd.Process != nil {
 		hugoCmd.Process.Kill()
+
+		// Wait for the process to exit in a background goroutine.
+		// This prevents zombie processes and cleans up I/O pipes.
+		go func(cmd *exec.Cmd) {
+			cmd.Wait()
+		}(hugoCmd)
+
 		hugoCmd = nil
 	}
 }
@@ -519,7 +532,7 @@ func GetHugoURL(filePathC, repoPathC *C.char) *C.char {
 		urlPath = strings.ReplaceAll(urlPath, "\\", "/")
 
 		// Check if it's an image file
-	ext := strings.ToLower(filepath.Ext(urlPath))
+		ext := strings.ToLower(filepath.Ext(urlPath))
 		isImage := ext == ".jpg" || ext == ".jpeg" || ext == ".png" ||
 			ext == ".gif" || ext == ".webp" || ext == ".svg" ||
 			ext == ".bmp" || ext == ".tiff"
