@@ -271,24 +271,52 @@ Item {
           }
         }
 
-        TextArea {
-          id: textArea
-          width: parent.width - lineNumbers.width
-          height: contentHeight
-          text: fileContent
-          textFormat: TextEdit.PlainText
+                        TextArea {
+                            id: textArea
+                            width: parent.width - lineNumbers.width
+                            height: contentHeight
+                            text: fileContent
+                            textFormat: TextEdit.PlainText
 
-          font.family: "Courier New"
-          font.pixelSize: 14
-          padding: 0
-          leftPadding: 5
+                            font.family: "Courier New"
+                            font.pixelSize: 14
+                            padding: 0
+                            leftPadding: 5
 
-          wrapMode: TextEdit.Wrap
-          selectByMouse: true
+                            wrapMode: TextEdit.Wrap
+                            selectByMouse: true
 
-          color: Qt.application.styleHints.colorScheme === Qt.Dark ? "white" : "black"
+                            color: Qt.application.styleHints.colorScheme === Qt.Dark ? "white" : "black"
 
-            // Notify LSP on user edits (not programmatic changes)
+                            onPressed: function(event) {
+                                if (Qt.platform.os === "linux" && event.button === Qt.RightButton) {
+                                    contextMenu.popup()
+                                    event.accepted = true
+                                }
+                            }
+
+                            Loader {
+                                id: contextMenuLoader
+                                active: Qt.platform.os === "linux"
+                                sourceComponent: Menu {
+                                    MenuItem {
+                                        text: qsTr("Copy")
+                                        enabled: textArea.selectedText.length > 0
+                                        onTriggered: textArea.copy()
+                                    }
+                                    MenuItem {
+                                        text: qsTr("Cut")
+                                        enabled: textArea.selectedText.length > 0
+                                        onTriggered: textArea.cut()
+                                    }
+                                    MenuItem {
+                                        text: qsTr("Paste")
+                                        onTriggered: textArea.paste()
+                                    }
+                                }
+                            }
+
+                            // Notify LSP on user edits (not programmatic changes)
             onTextEdited: {
                 var currentPath = tabModel.get(tabBar.currentIndex) ? tabModel.get(tabBar.currentIndex).filePath : ""
                 if (currentPath !== "") {
