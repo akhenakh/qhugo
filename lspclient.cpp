@@ -401,15 +401,17 @@ void LspClient::handleLog(const QString& message)
 }
 
 // Static C callbacks
-void LspClient::diagnosticCallback(const char* uri, const char* jsonDiagnostics)
-{
+void LspClient::diagnosticCallback(const char* uri, const char* jsonDiagnostics) {
     if (s_instance) {
         QString uriStr = QString::fromUtf8(uri);
         QByteArray data(jsonDiagnostics);
-
         QJsonDocument doc = QJsonDocument::fromJson(data);
         if (doc.isArray()) {
-            s_instance->handleDiagnostics(uriStr, doc.array());
+            QJsonArray docArray = doc.array();
+            // Queue the execution to the main thread
+            QMetaObject::invokeMethod(s_instance, [uriStr, docArray]() {
+                s_instance->handleDiagnostics(uriStr, docArray);
+            }, Qt::QueuedConnection);
         }
     }
 }
